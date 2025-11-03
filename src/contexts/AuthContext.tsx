@@ -46,6 +46,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
+          await ensureProfileExists(session.user);
           await loadProfile(session.user.id);
         } else {
           setProfile(null);
@@ -73,6 +74,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const ensureProfileExists = async (user: User) => {
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!existingProfile) {
+      await supabase.from('profiles').insert({
+        id: user.id,
+        username: user.email?.split('@')[0],
+        full_name: user.user_metadata.full_name || '',
+        avatar_url: user.user_metadata.avatar_url || '',
+        created_at: new Date().toISOString(),
+      });
+    }
+  };
+
   const signUp = async (email: string, password: string, username: string) => {
     try {
       const { data: existingUser } = await supabase
@@ -96,6 +115,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (error) return { error };
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) await ensureProfileExists(user);
+
       return { error: null };
     } catch (error) {
       return { error: error as Error };
@@ -110,6 +133,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (error) return { error };
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) await ensureProfileExists(user);
+
       return { error: null };
     } catch (error) {
       return { error: error as Error };
@@ -126,6 +153,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (error) return { error };
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) await ensureProfileExists(user);
+
       return { error: null };
     } catch (error) {
       return { error: error as Error };
